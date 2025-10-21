@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Emergency Queue</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #2d3436 0%, #000000 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .card h2 {
+            color: #2d3436;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-bottom: 3px solid #ff6b6b;
+            padding-bottom: 10px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .queue-item {
+            background: #fff5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 5px solid #ff6b6b;
+        }
+
+        .queue-item strong {
+            color: #ff6b6b;
+            font-size: 1.2em;
+        }
+
+        .queue-item p {
+            margin: 8px 0;
+            color: #333;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 2px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 2px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .donor-match {
+            background: #e8f5e9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            border-left: 4px solid #4caf50;
+        }
+
+        .history-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 5px solid #667eea;
+            transition: all 0.3s;
+        }
+
+        .history-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        .history-item.emergency {
+            border-left-color: #ff6b6b;
+            background: #fff5f5;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .match-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .match-badge.normal {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .match-badge.emergency {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .match-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .detail-box {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .detail-box h4 {
+            color: #666;
+            font-size: 0.85em;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .detail-box p {
+            margin: 5px 0;
+            color: #333;
+        }
+
+        .timestamp {
+            color: #999;
+            font-size: 0.9em;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            flex: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-box h3 {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+        }
+
+        .stat-box p {
+            opacity: 0.9;
+        }
+
+        .back-link {
+            color: white;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 Admin Panel - Emergency Queue</h1>
+            <p>Process emergency blood requests from the priority queue (Min-Heap)</p>
+            <a href="/" class="back-link">← Back to Main Page</a>
+        </div>
+
+        <div class="stats">
+            <div class="stat-box">
+                <h3 id="queueCount">0</h3>
+                <p>In Queue</p>
+            </div>
+            <div class="stat-box">
+                <h3 id="processedCount">0</h3>
+                <p>Processed</p>
+            </div>
+            <div class="stat-box">
+                <h3 id="totalMatches">0</h3>
+                <p>Total Matches</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Control Panel</h2>
+            <button onclick="viewQueue()">🔄 Refresh Queue</button>
+            <button onclick="processNext()">▶️ Process Next Emergency</button>
+            <button onclick="viewHistory()">📋 View Matching History</button>
+            <div class="result" id="processResult"></div>
+        </div>
+
+        <div class="card">
+            <h2>Emergency Queue</h2>
+            <div id="queueDisplay">
+                <p class="empty">Loading queue...</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📋 Matching History</h2>
+            <p style="color: #999; margin-bottom: 15px;">Complete record of all patient-donor matches</p>
+            <div id="historyDisplay">
+                <p class="empty">Loading history...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let processedTotal = 0;
+
+        // View Queue
+        async function viewQueue() {
+            try {
+                const response = await fetch('/api/emergency/queue');
+                const result = await response.json();
+                
+                const queueDisplay = document.getElementById('queueDisplay');
+                const queueCount = document.getElementById('queueCount');
+                
+                queueCount.textContent = result.total_requests || 0;
+                
+                if (result.queue && result.queue.length > 0) {
+                    queueDisplay.innerHTML = result.queue.map((item, index) => `
+                        <div class="queue-item">
+                            <strong>${index === 0 ? '⚡ NEXT TO PROCESS' : `Position ${index + 1}`}</strong>
+                            <p><strong>Blood Group:</strong> ${item.request.patient.blood_group}</p>
+                            <p><strong>Location:</strong> ${item.request.patient.location}</p>
+                            <p><strong>Urgency:</strong> Priority ${item.urgency_level}</p>
+                            <p><strong>Added:</strong> ${new Date(item.request.timestamp).toLocaleString()}</p>
+                        </div>
+                    `).join('');
+                } else {
+                    queueDisplay.innerHTML = '<p class="empty">✅ No emergency requests in queue</p>';
+                }
+            } catch (error) {
+                console.error('Error loading queue:', error);
+                document.getElementById('queueDisplay').innerHTML = `<p class="empty" style="color: red;">Error loading queue: ${error.message}</p>`;
+            }
+        }
+
+        // Process Next
+        async function processNext() {
+            const resultDiv = document.getElementById('processResult');
+            resultDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/emergency/process', {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    processedTotal++;
+                    document.getElementById('processedCount').textContent = processedTotal;
+                    
+                    if (result.match_found) {
+                        resultDiv.className = 'result success';
+                        resultDiv.style.display = 'block';
+                        resultDiv.innerHTML = `
+                            <h3>✅ Emergency Processed Successfully!</h3>
+                            <p><strong>Patient:</strong> ${result.request.patient.blood_group} at ${result.request.patient.location}</p>
+                            <div class="donor-match">
+                                <h4>🩸 Donor Matched:</h4>
+                                <p><strong>Name:</strong> ${result.donor.name}</p>
+                                <p><strong>Blood Group:</strong> ${result.donor.blood_group}</p>
+                                <p><strong>Location:</strong> ${result.donor.location}</p>
+                                <p><strong>Distance:</strong> ${result.distance_km} km</p>
+                            </div>
+                            <p style="margin-top: 15px;"><strong>Remaining in Queue:</strong> ${result.remaining_requests}</p>
+                        `;
+                    } else {
+                        resultDiv.className = 'result error';
+                        resultDiv.style.display = 'block';
+                        resultDiv.innerHTML = `
+                            <h3>⚠️ No Donor Found</h3>
+                            <p><strong>Patient:</strong> ${result.request.patient.blood_group} at ${result.request.patient.location}</p>
+                            <p><strong>Error:</strong> ${result.error}</p>
+                        `;
+                    }
+                    
+                    // Auto refresh
+                    viewQueue();
+                    viewHistory();
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.style.display = 'block';
+                    resultDiv.textContent = result.error || 'No emergency requests in queue';
+                }
+            } catch (error) {
+                console.error('Error processing emergency:', error);
+                resultDiv.className = 'result error';
+                resultDiv.style.display = 'block';
+                resultDiv.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        // View Matching History
+        async function viewHistory() {
+            try {
+                const response = await fetch('/api/matching-history');
+                const result = await response.json();
+                
+                const historyDisplay = document.getElementById('historyDisplay');
+                const totalMatches = document.getElementById('totalMatches');
+                
+                totalMatches.textContent = result.total_matches || 0;
+                
+                if (result.matches && result.matches.length > 0) {
+                    historyDisplay.innerHTML = result.matches.map((match, index) => `
+                        <div class="history-item ${match.match_type === 'Emergency' ? 'emergency' : ''}">
+                            <div class="history-header">
+                                <div>
+                                    <strong style="font-size: 1.1em;">Match #${result.total_matches - index}</strong>
+                                    <span class="match-badge ${match.match_type.toLowerCase()}">${match.match_type}</span>
+                                    ${match.match_type === 'Emergency' ? `<span class="match-badge emergency">Urgency ${match.urgency_level}</span>` : ''}
+                                </div>
+                                <span class="timestamp">${new Date(match.timestamp).toLocaleString()}</span>
+                            </div>
+                            <div class="match-details">
+                                <div class="detail-box">
+                                    <h4>👤 Patient</h4>
+                                    <p><strong>Blood Group:</strong> ${match.patient.blood_group}</p>
+                                    <p><strong>Location:</strong> ${match.patient.location}</p>
+                                </div>
+                                <div class="detail-box">
+                                    <h4>🩸 Donor</h4>
+                                    <p><strong>Name:</strong> ${match.donor.name}</p>
+                                    <p><strong>Blood Group:</strong> ${match.donor.blood_group}</p>
+                                    <p><strong>Location:</strong> ${match.donor.location}</p>
+                                </div>
+                            </div>
+                            <p style="margin-top: 10px; color: #666;"><strong>Distance:</strong> ${match.distance_km} km | <strong>Match ID:</strong> ${match.match_id.substring(0, 8)}...</p>
+                        </div>
+                    `).join('');
+                } else {
+                    historyDisplay.innerHTML = '<p class="empty">No matching records yet</p>';
+                }
+            } catch (error) {
+                console.error('Error loading history:', error);
+                document.getElementById('historyDisplay').innerHTML = `<p class="empty" style="color: red;">Error loading history: ${error.message}</p>`;
+            }
+        }
+
+        // Auto-load on page open
+        window.addEventListener('DOMContentLoaded', () => {
+            viewQueue();
+            viewHistory();
+        });
+
+        // Auto-refresh every 10 seconds
+        setInterval(() => {
+            viewQueue();
+        }, 10000);
+    </script>
+</body>
+</html>
