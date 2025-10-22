@@ -367,17 +367,17 @@ def get_matching_history():
         'matches': list(reversed(formatted_matches))  # Most recent first
     })
 
-if __name__ == '__main__':
-    # Add some sample donors
+def initialize_dummy_data():
+    """Add sample donors on startup"""
     sample_donors = [
         {'name': 'John Doe', 'blood_group': 'O-', 'location': 'Hospital A', 'last_donation_date': '2025-01-01'},
         {'name': 'Jane Smith', 'blood_group': 'O+', 'location': 'Hospital B', 'last_donation_date': '2025-02-15'},
         {'name': 'Bob Johnson', 'blood_group': 'A+', 'location': 'Hospital C', 'last_donation_date': '2025-03-20'},
         {'name': 'Alice Williams', 'blood_group': 'B-', 'location': 'Hospital D', 'last_donation_date': '2025-01-10'},
         {'name': 'Charlie Brown', 'blood_group': 'AB+', 'location': 'Hospital A', 'last_donation_date': '2025-02-01'},
-        {'name': 'David Miller', 'blood_group': 'O-', 'location': 'Hospital C', 'last_donation_date': '2025-01-15'},
-        {'name': 'Emma Davis', 'blood_group': 'A-', 'location': 'Hospital B', 'last_donation_date': '2025-02-20'},
-        {'name': 'Frank Wilson', 'blood_group': 'B+', 'location': 'Hospital D', 'last_donation_date': '2025-03-01'},
+        {'name': 'David Lee', 'blood_group': 'O-', 'location': 'Hospital B', 'last_donation_date': '2025-01-15'},
+        {'name': 'Emma Wilson', 'blood_group': 'A+', 'location': 'Hospital D', 'last_donation_date': '2025-02-20'},
+        {'name': 'Frank Miller', 'blood_group': 'B+', 'location': 'Hospital C', 'last_donation_date': '2025-01-25'},
     ]
     
     for donor_data in sample_donors:
@@ -391,6 +391,11 @@ if __name__ == '__main__':
         }
         donors_by_blood_group[blood_group].append(donor)
     
+    print(f"✅ Initialized with {len(sample_donors)} sample donors")
+
+# Initialize dummy data when module loads
+initialize_dummy_data()
+    
     print("=" * 60)
     print("🩸 Blood Donor Matching System Started")
     print("=" * 60)
@@ -399,4 +404,5 @@ if __name__ == '__main__':
     print("Admin Panel: http://localhost:5000/admin")
     print("=" * 60)
     
+
     app.run(debug=True, host='0.0.0.0', port=5000)
