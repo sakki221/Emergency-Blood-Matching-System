@@ -340,33 +340,13 @@ def get_stats():
 
 @app.route('/api/matching-history', methods=['GET'])
 def get_matching_history():
-    """Get all matching history with proper format for admin panel"""
-    # Format matches for admin panel
-    formatted_matches = []
-    for match in matching_history:
-        formatted_match = {
-            'match_id': str(uuid.uuid4()),  # Generate unique ID for each match
-            'timestamp': match['timestamp'],
-            'match_type': match['type'],  # 'Normal' or 'Emergency'
-            'urgency_level': match.get('urgency', 'N/A'),  # Only for emergency
-            'patient': {
-                'blood_group': match['patient_blood'],
-                'location': match['patient_location']
-            },
-            'donor': {
-                'name': match['donor_name'],
-                'blood_group': match['donor_blood'],
-                'location': match['donor_location']
-            },
-            'distance_km': match['distance_km']
-        }
-        formatted_matches.append(formatted_match)
-    
+    """Get all matching history"""
     return jsonify({
-        'total_matches': len(formatted_matches),
-        'matches': list(reversed(formatted_matches))  # Most recent first
+        'total': len(matching_history),
+        'matches': list(reversed(matching_history))  # Most recent first
     })
 
+# ==================== INITIALIZE DUMMY DATA ====================
 def initialize_dummy_data():
     """Add sample donors on startup"""
     sample_donors = [
@@ -395,14 +375,8 @@ def initialize_dummy_data():
 
 # Initialize dummy data when module loads
 initialize_dummy_data()
-    
-    print("=" * 60)
-    print("🩸 Blood Donor Matching System Started")
-    print("=" * 60)
-    print(f"Sample donors added: {len(sample_donors)}")
-    print("Main Interface: http://localhost:5000/")
-    print("Admin Panel: http://localhost:5000/admin")
-    print("=" * 60)
-    
 
+if __name__ == '__main__':
+    print("🩸 Blood Donor Matching System Starting...")
+    print(f"📊 Sample donors loaded: {sum(len(donors) for donors in donors_by_blood_group.values())}")
     app.run(debug=True, host='0.0.0.0', port=5000)
