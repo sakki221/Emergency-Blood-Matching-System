@@ -340,24 +340,44 @@ def get_stats():
 
 @app.route('/api/matching-history', methods=['GET'])
 def get_matching_history():
-    """Get all matching history"""
+    """Get all matching history with proper format for admin panel"""
+    # Format matches for admin panel
+    formatted_matches = []
+    for match in matching_history:
+        formatted_match = {
+            'match_id': str(uuid.uuid4()),  # Generate unique ID for each match
+            'timestamp': match['timestamp'],
+            'match_type': match['type'],  # 'Normal' or 'Emergency'
+            'urgency_level': match.get('urgency', 'N/A'),  # Only for emergency
+            'patient': {
+                'blood_group': match['patient_blood'],
+                'location': match['patient_location']
+            },
+            'donor': {
+                'name': match['donor_name'],
+                'blood_group': match['donor_blood'],
+                'location': match['donor_location']
+            },
+            'distance_km': match['distance_km']
+        }
+        formatted_matches.append(formatted_match)
+    
     return jsonify({
-        'total': len(matching_history),
-        'matches': list(reversed(matching_history))  # Most recent first
+        'total_matches': len(formatted_matches),
+        'matches': list(reversed(formatted_matches))  # Most recent first
     })
 
-# ==================== INITIALIZE DUMMY DATA ====================
-def initialize_dummy_data():
-    """Add sample donors on startup"""
+if __name__ == '__main__':
+    # Add some sample donors
     sample_donors = [
         {'name': 'John Doe', 'blood_group': 'O-', 'location': 'Hospital A', 'last_donation_date': '2025-01-01'},
         {'name': 'Jane Smith', 'blood_group': 'O+', 'location': 'Hospital B', 'last_donation_date': '2025-02-15'},
         {'name': 'Bob Johnson', 'blood_group': 'A+', 'location': 'Hospital C', 'last_donation_date': '2025-03-20'},
         {'name': 'Alice Williams', 'blood_group': 'B-', 'location': 'Hospital D', 'last_donation_date': '2025-01-10'},
         {'name': 'Charlie Brown', 'blood_group': 'AB+', 'location': 'Hospital A', 'last_donation_date': '2025-02-01'},
-        {'name': 'David Lee', 'blood_group': 'O-', 'location': 'Hospital B', 'last_donation_date': '2025-01-15'},
-        {'name': 'Emma Wilson', 'blood_group': 'A+', 'location': 'Hospital D', 'last_donation_date': '2025-02-20'},
-        {'name': 'Frank Miller', 'blood_group': 'B+', 'location': 'Hospital C', 'last_donation_date': '2025-01-25'},
+        {'name': 'David Miller', 'blood_group': 'O-', 'location': 'Hospital C', 'last_donation_date': '2025-01-15'},
+        {'name': 'Emma Davis', 'blood_group': 'A-', 'location': 'Hospital B', 'last_donation_date': '2025-02-20'},
+        {'name': 'Frank Wilson', 'blood_group': 'B+', 'location': 'Hospital D', 'last_donation_date': '2025-03-01'},
     ]
     
     for donor_data in sample_donors:
@@ -371,12 +391,12 @@ def initialize_dummy_data():
         }
         donors_by_blood_group[blood_group].append(donor)
     
-    print(f"✅ Initialized with {len(sample_donors)} sample donors")
-
-# Initialize dummy data when module loads
-initialize_dummy_data()
-
-if __name__ == '__main__':
-    print("🩸 Blood Donor Matching System Starting...")
-    print(f"📊 Sample donors loaded: {sum(len(donors) for donors in donors_by_blood_group.values())}")
+    print("=" * 60)
+    print("🩸 Blood Donor Matching System Started")
+    print("=" * 60)
+    print(f"Sample donors added: {len(sample_donors)}")
+    print("Main Interface: http://localhost:5000/")
+    print("Admin Panel: http://localhost:5000/admin")
+    print("=" * 60)
+    
     app.run(debug=True, host='0.0.0.0', port=5000)
