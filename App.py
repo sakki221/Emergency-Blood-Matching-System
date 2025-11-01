@@ -4,6 +4,7 @@ import heapq
 import uuid
 import datetime
 import urllib.parse
+import os
 
 app = Flask(__name__)
 
@@ -11,7 +12,7 @@ app = Flask(__name__)
 donors_by_blood_group = defaultdict(list)
 emergency_requests = []
 emergency_counter = [0]
-matching_history = []  # Track all matches
+matching_history = []
 
 # Blood compatibility: Who can receive from whom
 BLOOD_COMPATIBILITY = {
@@ -95,6 +96,9 @@ def find_nearest_donor(patient_blood_group, patient_location):
     for blood_type in compatible_types:
         all_compatible_donors.extend(donors_by_blood_group.get(blood_type, []))
     
+    if not all_compatible_donors:
+        return None, None, f"No donors found for compatible blood types: {', '.join(compatible_types)}"
+    
     # Filter eligible donors and find nearest
     best_donor = None
     min_distance = float('inf')
@@ -109,7 +113,36 @@ def find_nearest_donor(patient_blood_group, patient_location):
     if best_donor:
         return best_donor, min_distance, None
     else:
-        return None, None, "No eligible donor found"
+        return None, None, f"Found {len(all_compatible_donors)} donor(s) but none are eligible (90-day waiting period)"
+
+def initialize_sample_data():
+    """Initialize sample donors - called on startup"""
+    sample_donors = [
+        {'name': 'John Doe', 'blood_group': 'O-', 'location': 'Hospital A', 'last_donation_date': '2024-08-01'},
+        {'name': 'Jane Smith', 'blood_group': 'O+', 'location': 'Hospital B', 'last_donation_date': '2024-08-15'},
+        {'name': 'Bob Johnson', 'blood_group': 'A+', 'location': 'Hospital C', 'last_donation_date': '2024-07-20'},
+        {'name': 'Alice Williams', 'blood_group': 'B-', 'location': 'Hospital D', 'last_donation_date': '2024-08-10'},
+        {'name': 'Charlie Brown', 'blood_group': 'AB+', 'location': 'Hospital A', 'last_donation_date': '2024-08-01'},
+        {'name': 'David Miller', 'blood_group': 'O-', 'location': 'Hospital C', 'last_donation_date': '2024-07-15'},
+        {'name': 'Emma Davis', 'blood_group': 'A-', 'location': 'Hospital B', 'last_donation_date': '2024-07-20'},
+        {'name': 'Frank Wilson', 'blood_group': 'B+', 'location': 'Hospital D', 'last_donation_date': '2024-08-01'},
+        {'name': 'Grace Lee', 'blood_group': 'O+', 'location': 'Hospital A', 'last_donation_date': '2024-07-25'},
+        {'name': 'Henry Taylor', 'blood_group': 'A+', 'location': 'Hospital B', 'last_donation_date': '2024-08-05'},
+    ]
+    
+    for donor_data in sample_donors:
+        blood_group = normalize_blood_group(donor_data['blood_group'])
+        donor = {
+            'id': str(uuid.uuid4()),
+            'name': donor_data['name'],
+            'blood_group': blood_group,
+            'location': donor_data['location'],
+            'last_donation_date': donor_data['last_donation_date'],
+            'total_donations': 0
+        }
+        donors_by_blood_group[blood_group].append(donor)
+    
+    print(f"✓ Initialized {len(sample_donors)} sample donors")
 
 # ==================== API ENDPOINTS ====================
 
@@ -120,6 +153,17 @@ def home():
 @app.route('/admin')
 def admin():
     return render_template('admin.html')
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for Render"""
+    total_donors = sum(len(donors) for donors in donors_by_blood_group.values())
+    return jsonify({
+        'status': 'healthy',
+        'total_donors': total_donors,
+        'emergency_queue_size': len(emergency_requests),
+        'timestamp': datetime.datetime.now().isoformat()
+    }), 200
 
 @app.route('/api/donors', methods=['POST'])
 def add_donor():
@@ -138,13 +182,18 @@ def add_donor():
         if blood_group not in BLOOD_COMPATIBILITY:
             return jsonify({'error': 'Invalid blood group'}), 400
         
+        # Validate location
+        if data['location'] not in LOCATIONS:
+            return jsonify({'error': f'Invalid location. Must be one of: {", ".join(LOCATIONS.keys())}'}), 400
+        
         # Create donor record
         donor = {
             'id': str(uuid.uuid4()),
             'name': data['name'],
             'blood_group': blood_group,
             'location': data['location'],
-            'last_donation_date': data['last_donation_date']
+            'last_donation_date': data['last_donation_date'],
+            'total_donations': 0
         }
         
         donors_by_blood_group[blood_group].append(donor)
@@ -156,6 +205,18 @@ def add_donor():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/donors', methods=['GET'])
+def get_all_donors():
+    """Get all donors"""
+    all_donors = []
+    for blood_group, donors in donors_by_blood_group.items():
+        all_donors.extend(donors)
+    
+    return jsonify({
+        'total_donors': len(all_donors),
+        'donors': all_donors
+    }), 200
 
 @app.route('/api/donors/search', methods=['GET'])
 def search_donors():
@@ -184,9 +245,9 @@ def match_donor():
     if error:
         return jsonify({'error': error}), 404
     
-    # Remove donor from pool
-    donor_blood_group = donor['blood_group']
-    donors_by_blood_group[donor_blood_group].remove(donor)
+    # ✅ UPDATE: Mark donor as recently donated instead of removing
+    donor['last_donation_date'] = datetime.datetime.now().strftime('%Y-%m-%d')
+    donor['total_donations'] = donor.get('total_donations', 0) + 1
     
     # Track match
     matching_history.append({
@@ -203,7 +264,8 @@ def match_donor():
     return jsonify({
         'match_found': True,
         'donor': donor,
-        'distance_km': distance
+        'distance_km': distance,
+        'message': 'Donor matched successfully! They will be eligible again after 90 days.'
     })
 
 @app.route('/api/emergency', methods=['POST'])
@@ -218,6 +280,10 @@ def emergency_request():
         if not patient.get('blood_group') or not patient.get('location'):
             return jsonify({'error': 'Patient blood_group and location required'}), 400
         
+        # Validate urgency level
+        if not isinstance(urgency, int) or urgency < 1 or urgency > 5:
+            return jsonify({'error': 'urgency_level must be an integer between 1-5'}), 400
+        
         # Add to emergency queue with timestamp
         request_id = str(uuid.uuid4())
         request_data = {
@@ -226,7 +292,7 @@ def emergency_request():
             'timestamp': datetime.datetime.now().isoformat()
         }
         
-        # Use counter as tiebreaker
+        # Use counter as tiebreaker (lower urgency = higher priority)
         emergency_counter[0] += 1
         heapq.heappush(emergency_requests, (urgency, emergency_counter[0], request_data))
         
@@ -247,7 +313,7 @@ def process_next_emergency():
         return jsonify({'error': 'No emergency requests in queue'}), 404
     
     try:
-        # Pop highest priority request
+        # Pop highest priority request (Min-Heap)
         urgency, counter, request_data = heapq.heappop(emergency_requests)
         patient = request_data['patient']
         
@@ -267,9 +333,9 @@ def process_next_emergency():
                 'remaining_requests': len(emergency_requests)
             }), 200
         
-        # Remove donor from pool
-        donor_blood_group = donor['blood_group']
-        donors_by_blood_group[donor_blood_group].remove(donor)
+        # ✅ UPDATE: Mark donor as recently donated instead of removing
+        donor['last_donation_date'] = datetime.datetime.now().strftime('%Y-%m-%d')
+        donor['total_donations'] = donor.get('total_donations', 0) + 1
         
         # Track match
         matching_history.append({
@@ -291,7 +357,8 @@ def process_next_emergency():
             'match_found': True,
             'donor': donor,
             'distance_km': distance,
-            'remaining_requests': len(emergency_requests)
+            'remaining_requests': len(emergency_requests),
+            'donor_message': 'Donor will be eligible again after 90 days'
         }), 200
         
     except Exception as e:
@@ -333,22 +400,22 @@ def get_stats():
         eligible = sum(1 for d in donors if is_donor_eligible(d))
         stats[blood_group] = {
             'total': len(donors),
-            'eligible': eligible
+            'eligible': eligible,
+            'not_eligible': len(donors) - eligible
         }
     
     return jsonify(stats)
 
 @app.route('/api/matching-history', methods=['GET'])
 def get_matching_history():
-    """Get all matching history with proper format for admin panel"""
-    # Format matches for admin panel
+    """Get all matching history"""
     formatted_matches = []
     for match in matching_history:
         formatted_match = {
-            'match_id': str(uuid.uuid4()),  # Generate unique ID for each match
+            'match_id': str(uuid.uuid4()),
             'timestamp': match['timestamp'],
-            'match_type': match['type'],  # 'Normal' or 'Emergency'
-            'urgency_level': match.get('urgency', 'N/A'),  # Only for emergency
+            'match_type': match['type'],
+            'urgency_level': match.get('urgency', 'N/A'),
             'patient': {
                 'blood_group': match['patient_blood'],
                 'location': match['patient_location']
@@ -364,39 +431,25 @@ def get_matching_history():
     
     return jsonify({
         'total_matches': len(formatted_matches),
-        'matches': list(reversed(formatted_matches))  # Most recent first
+        'matches': list(reversed(formatted_matches))
     })
 
+# ==================== INITIALIZATION ====================
+
+# Initialize sample data when app starts
+initialize_sample_data()
+
 if __name__ == '__main__':
-    # Add some sample donors
-    sample_donors = [
-        {'name': 'John Doe', 'blood_group': 'O-', 'location': 'Hospital A', 'last_donation_date': '2025-01-01'},
-        {'name': 'Jane Smith', 'blood_group': 'O+', 'location': 'Hospital B', 'last_donation_date': '2025-02-15'},
-        {'name': 'Bob Johnson', 'blood_group': 'A+', 'location': 'Hospital C', 'last_donation_date': '2025-03-20'},
-        {'name': 'Alice Williams', 'blood_group': 'B-', 'location': 'Hospital D', 'last_donation_date': '2025-01-10'},
-        {'name': 'Charlie Brown', 'blood_group': 'AB+', 'location': 'Hospital A', 'last_donation_date': '2025-02-01'},
-        {'name': 'David Miller', 'blood_group': 'O-', 'location': 'Hospital C', 'last_donation_date': '2025-01-15'},
-        {'name': 'Emma Davis', 'blood_group': 'A-', 'location': 'Hospital B', 'last_donation_date': '2025-02-20'},
-        {'name': 'Frank Wilson', 'blood_group': 'B+', 'location': 'Hospital D', 'last_donation_date': '2025-03-01'},
-    ]
-    
-    for donor_data in sample_donors:
-        blood_group = normalize_blood_group(donor_data['blood_group'])
-        donor = {
-            'id': str(uuid.uuid4()),
-            'name': donor_data['name'],
-            'blood_group': blood_group,
-            'location': donor_data['location'],
-            'last_donation_date': donor_data['last_donation_date']
-        }
-        donors_by_blood_group[blood_group].append(donor)
-    
     print("=" * 60)
     print("🩸 Blood Donor Matching System Started")
     print("=" * 60)
-    print(f"Sample donors added: {len(sample_donors)}")
-    print("Main Interface: http://localhost:5000/")
-    print("Admin Panel: http://localhost:5000/admin")
+    total_donors = sum(len(donors) for donors in donors_by_blood_group.values())
+    print(f"✓ Total donors in system: {total_donors}")
+    print("✓ Main Interface: http://localhost:5000/")
+    print("✓ Admin Panel: http://localhost:5000/admin")
+    print("✓ Health Check: http://localhost:5000/api/health")
     print("=" * 60)
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Get port from environment variable for Render deployment
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
