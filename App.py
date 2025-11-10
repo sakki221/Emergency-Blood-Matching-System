@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for
+from flask import Flask, request, jsonify, render_template
 from collections import defaultdict
 import heapq
 import uuid
@@ -7,16 +7,12 @@ import urllib.parse
 import os
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-production')
 
 # ==================== DATA STRUCTURES ====================
 donors_by_blood_group = defaultdict(list)
 emergency_requests = []
 emergency_counter = [0]
 matching_history = []  # Track all matches
-
-# Admin credentials (change these!)
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 
 # Blood compatibility: Who can receive from whom
 BLOOD_COMPATIBILITY = {
@@ -116,7 +112,7 @@ def find_nearest_donor(patient_blood_group, patient_location):
     else:
         return None, None, "No eligible donor found"
 
-# ==================== API ENDPOINTS ====================
+# ==================== ROUTES ====================
 
 @app.route('/')
 def home():
@@ -124,25 +120,10 @@ def home():
 
 @app.route('/admin')
 def admin():
-    if not session.get('admin_authenticated'):
-        return redirect(url_for('admin_login'))
+    # Direct access to admin panel - no authentication required
     return render_template('admin.html')
 
-@app.route('/admin/login', methods=['GET', 'POST'])
-def admin_login():
-    if request.method == 'POST':
-        password = request.form.get('password')
-        if password == ADMIN_PASSWORD:
-            session['admin_authenticated'] = True
-            return redirect(url_for('admin'))
-        else:
-            return render_template('admin_login.html', error='Invalid password')
-    return render_template('admin_login.html')
-
-@app.route('/admin/logout')
-def admin_logout():
-    session.pop('admin_authenticated', None)
-    return redirect(url_for('home'))
+# ==================== API ENDPOINTS ====================
 
 @app.route('/api/donors', methods=['POST'])
 def add_donor():
