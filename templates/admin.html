@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 0 auto;
         }
 
@@ -151,7 +151,6 @@
             border-radius: 15px;
             font-size: 0.85em;
             font-weight: 600;
-            margin-left: 10px;
         }
 
         .match-badge.normal {
@@ -236,6 +235,57 @@
         .back-link:hover {
             text-decoration: underline;
         }
+
+        /* Donor list table styles */
+        .donor-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .donor-table th,
+        .donor-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .donor-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .donor-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .status-badge.eligible {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.ineligible {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .blood-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #ff6b6b;
+            color: white;
+            border-radius: 12px;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -243,7 +293,10 @@
         <div class="header">
             <h1>🚨 Admin Panel - Emergency Queue</h1>
             <p>Process emergency blood requests from the priority queue (Min-Heap)</p>
-            <a href="/" class="back-link">← Back to Main Page</a>
+            <div style="margin-top: 15px;">
+                <a href="/" class="back-link">← Back to Main Page</a>
+                <a href="/admin/logout" class="back-link" style="margin-left: 20px; color: #ff6b6b;">🔓 Logout</a>
+            </div>
         </div>
 
         <div class="stats">
@@ -253,11 +306,19 @@
             </div>
             <div class="stat-box">
                 <h3 id="processedCount">0</h3>
-                <p>Processed</p>
+                <p>Processed Today</p>
             </div>
             <div class="stat-box">
                 <h3 id="totalMatches">0</h3>
                 <p>Total Matches</p>
+            </div>
+            <div class="stat-box">
+                <h3 id="totalDonors">0</h3>
+                <p>Total Donors</p>
+            </div>
+            <div class="stat-box">
+                <h3 id="eligibleDonors">0</h3>
+                <p>Eligible Now</p>
             </div>
         </div>
 
@@ -266,27 +327,94 @@
             <button onclick="viewQueue()">🔄 Refresh Queue</button>
             <button onclick="processNext()">▶️ Process Next Emergency</button>
             <button onclick="viewHistory()">📋 View Matching History</button>
+            <button onclick="viewAllDonors()">🩸 View All Donors</button>
             <div class="result" id="processResult"></div>
+        </div>
+
+        <!-- NEW: All Donors Section -->
+        <div class="card">
+            <h2>🩸 All Registered Donors</h2>
+            <p style="color: #999; margin-bottom: 15px;">Complete list of all donors in the system</p>
+            <div id="donorsDisplay">
+                <p class="empty">Click "View All Donors" to load donor list</p>
+            </div>
+        </div>
+
+        <!-- UPDATED: Matching History Section -->
+        <div class="card">
+            <h2>📋 Matching History (Patient-Donor Matches)</h2>
+            <p style="color: #999; margin-bottom: 15px;">Complete record of all patient-donor matches</p>
+            <div id="historyDisplay">
+                <p class="empty">Click "View Matching History" to load records</p>
+            </div>
         </div>
 
         <div class="card">
             <h2>Emergency Queue</h2>
             <div id="queueDisplay">
-                <p class="empty">Loading queue...</p>
-            </div>
-        </div>
-
-        <div class="card">
-            <h2>📋 Matching History</h2>
-            <p style="color: #999; margin-bottom: 15px;">Complete record of all patient-donor matches</p>
-            <div id="historyDisplay">
-                <p class="empty">Loading history...</p>
+                <p class="empty">Click "Refresh Queue" to view emergency requests</p>
             </div>
         </div>
     </div>
 
     <script>
         let processedTotal = 0;
+
+        // NEW: View All Donors
+        async function viewAllDonors() {
+            try {
+                const response = await fetch('/api/all-donors');
+                const result = await response.json();
+                
+                const donorsDisplay = document.getElementById('donorsDisplay');
+                const totalDonors = document.getElementById('totalDonors');
+                const eligibleDonors = document.getElementById('eligibleDonors');
+                
+                totalDonors.textContent = result.total_donors || 0;
+                eligibleDonors.textContent = result.eligible_donors || 0;
+                
+                if (result.donors && result.donors.length > 0) {
+                    donorsDisplay.innerHTML = `
+                        <table class="donor-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Name</th>
+                                    <th>Blood Group</th>
+                                    <th>Location</th>
+                                    <th>Last Donation</th>
+                                    <th>Status</th>
+                                    <th>Days Since</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${result.donors.map((donor, index) => `
+                                    <tr>
+                                        <td>${index + 1}</td>
+                                        <td><strong>${donor.name}</strong></td>
+                                        <td><span class="blood-badge">${donor.blood_group}</span></td>
+                                        <td>${donor.location}</td>
+                                        <td>${donor.last_donation_date}</td>
+                                        <td>
+                                            <span class="status-badge ${donor.eligible ? 'eligible' : 'ineligible'}">
+                                                ${donor.eligible ? '✓ Eligible' : '✗ Not Eligible'}
+                                            </span>
+                                        </td>
+                                        <td>${donor.days_since_donation} days
+                                            ${!donor.eligible ? `<br><small style="color: #999;">(${donor.days_until_eligible} days left)</small>` : ''}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                } else {
+                    donorsDisplay.innerHTML = '<p class="empty">No donors registered yet</p>';
+                }
+            } catch (error) {
+                document.getElementById('donorsDisplay').innerHTML = `<p class="empty" style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
 
         // View Queue
         async function viewQueue() {
@@ -313,8 +441,7 @@
                     queueDisplay.innerHTML = '<p class="empty">✅ No emergency requests in queue</p>';
                 }
             } catch (error) {
-                console.error('Error loading queue:', error);
-                document.getElementById('queueDisplay').innerHTML = `<p class="empty" style="color: red;">Error loading queue: ${error.message}</p>`;
+                document.getElementById('queueDisplay').innerHTML = `<p class="empty" style="color: red;">Error: ${error.message}</p>`;
             }
         }
 
@@ -359,16 +486,16 @@
                         `;
                     }
                     
-                    // Auto refresh
+                    // Auto refresh everything
                     viewQueue();
                     viewHistory();
+                    viewAllDonors();
                 } else {
                     resultDiv.className = 'result error';
                     resultDiv.style.display = 'block';
                     resultDiv.textContent = result.error || 'No emergency requests in queue';
                 }
             } catch (error) {
-                console.error('Error processing emergency:', error);
                 resultDiv.className = 'result error';
                 resultDiv.style.display = 'block';
                 resultDiv.textContent = 'Error: ' + error.message;
@@ -381,57 +508,55 @@
                 const response = await fetch('/api/matching-history');
                 const result = await response.json();
                 
+                console.log('History result:', result); // Debug log
+                
                 const historyDisplay = document.getElementById('historyDisplay');
                 const totalMatches = document.getElementById('totalMatches');
                 
-                totalMatches.textContent = result.total_matches || 0;
+                totalMatches.textContent = result.total || 0;
                 
                 if (result.matches && result.matches.length > 0) {
-                    historyDisplay.innerHTML = result.matches.map((match, index) => `
-                        <div class="history-item ${match.match_type === 'Emergency' ? 'emergency' : ''}">
+                    historyDisplay.innerHTML = result.matches.map((match, index) => {
+                        console.log('Match object:', match); // Debug log
+                        return `
+                        <div class="history-item ${match.type === 'Emergency' ? 'emergency' : ''}">
                             <div class="history-header">
                                 <div>
-                                    <strong style="font-size: 1.1em;">Match #${result.total_matches - index}</strong>
-                                    <span class="match-badge ${match.match_type.toLowerCase()}">${match.match_type}</span>
-                                    ${match.match_type === 'Emergency' ? `<span class="match-badge emergency">Urgency ${match.urgency_level}</span>` : ''}
+                                    <strong style="font-size: 1.1em;">Match #${result.total - index}</strong>
+                                    <span class="match-badge ${(match.type || 'normal').toLowerCase()}">${match.type || 'Normal'}</span>
+                                    ${match.type === 'Emergency' && match.urgency ? `<span class="match-badge emergency">Priority ${match.urgency}</span>` : ''}
                                 </div>
                                 <span class="timestamp">${new Date(match.timestamp).toLocaleString()}</span>
                             </div>
                             <div class="match-details">
                                 <div class="detail-box">
                                     <h4>👤 Patient</h4>
-                                    <p><strong>Blood Group:</strong> ${match.patient.blood_group}</p>
-                                    <p><strong>Location:</strong> ${match.patient.location}</p>
+                                    <p><strong>Blood Group:</strong> ${match.patient_blood || 'N/A'}</p>
+                                    <p><strong>Location:</strong> ${match.patient_location || 'N/A'}</p>
                                 </div>
                                 <div class="detail-box">
                                     <h4>🩸 Donor</h4>
-                                    <p><strong>Name:</strong> ${match.donor.name}</p>
-                                    <p><strong>Blood Group:</strong> ${match.donor.blood_group}</p>
-                                    <p><strong>Location:</strong> ${match.donor.location}</p>
+                                    <p><strong>Name:</strong> ${match.donor_name || 'N/A'}</p>
+                                    <p><strong>Blood Group:</strong> ${match.donor_blood || 'N/A'}</p>
+                                    <p><strong>Location:</strong> ${match.donor_location || 'N/A'}</p>
                                 </div>
                             </div>
-                            <p style="margin-top: 10px; color: #666;"><strong>Distance:</strong> ${match.distance_km} km | <strong>Match ID:</strong> ${match.match_id.substring(0, 8)}...</p>
+                            <p style="margin-top: 10px; color: #666;"><strong>Distance:</strong> ${match.distance_km || 'N/A'} km</p>
                         </div>
-                    `).join('');
+                    `}).join('');
                 } else {
                     historyDisplay.innerHTML = '<p class="empty">No matching records yet</p>';
                 }
             } catch (error) {
-                console.error('Error loading history:', error);
-                document.getElementById('historyDisplay').innerHTML = `<p class="empty" style="color: red;">Error loading history: ${error.message}</p>`;
+                console.error('History error:', error); // Debug log
+                document.getElementById('historyDisplay').innerHTML = `<p class="empty" style="color: red;">Error: ${error.message}</p>`;
             }
         }
 
         // Auto-load on page open
-        window.addEventListener('DOMContentLoaded', () => {
-            viewQueue();
-            viewHistory();
-        });
-
-        // Auto-refresh every 10 seconds
-        setInterval(() => {
-            viewQueue();
-        }, 10000);
+        viewQueue();
+        viewHistory();
+        viewAllDonors();
     </script>
 </body>
 </html>
